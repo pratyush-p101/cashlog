@@ -156,6 +156,94 @@ async function geminiExtract(text: string): Promise<ParsedExpense | null> {
   }
 }
 
+/**
+ * Bulk extraction: one Gemini call for several segments at once, so a
+ * 10-line message costs one request, not ten.
+ */
+async function geminiBulk(segments: string[]): Promise<(ParsedExpense | null)[]> {
+  const none = segments.map(() => null);
+  const answer = await geminiText(
+    `Extract the expense from each numbered line (Indian household, amounts in INR).\n` +
+      segments.map((s, i) => `${i + 1}. ${s}`).join("\n") +
+      `\nReply with only a JSON array with exactly ${segments.length} objects, ` +
+      `one per line in the same order: ` +
+      `[{"amount": <number in rupees>, "description": "<2-4 words, no amount>", ` +
+      `"category": "<one of: ${CATEGORIES.join(", ")}>"}]. ` +
+      `Use {"amount": 0} for a line that contains no money amount.`,
+    true
+  );
+  if (!answer) return none;
+  try {
+    const cleaned = answer.replace(/^```(?:json)?/i, "").replace(/```$/, "");
+    const arr = JSON.parse(cleaned);
+    if (!Array.isArray(arr)) return none;
+    return segments.map((_, i) => {
+      const item = arr[i];
+      const amount = Number(item?.amount);
+      if (!isFinite(amount) || amount <= 0) return null;
+      const category =
+        CATEGORIES.find(
+          (c) => c.toLowerCase() === String(item?.category ?? "").toLowerCase()
+        ) ?? "Other";
+      const description =
+        String(item?.description ?? "").trim().slice(0, 100) || "Expense";
+      return { amount, description, category, via: "gemini" as const };
+    });
+  } catch {
+    console.error("gemini: bulk returned non-JSON:", answer.slice(0, 200));
+    return none;
+  }
+}
+
+/**
+ * Parses a message that may contain several expenses — split on newlines,
+ * semicolons, or commas (commas inside amounts like "1,500" are kept).
+ * Returns the expenses found plus how many segments couldn't be read.
+ */
+export async function parseExpenses(
+  text: string
+): Promise<{ saved: ParsedExpense[]; skipped: number }> {
+  const segments = text
+    .split(/[\n;]+|,(?!\d)/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (segments.length <= 1) {
+    const one = await parseExpense(text);
+    return { saved: one ? [one] : [], skipped: one ? 0 : 1 };
+  }
+
+  const out: (ParsedExpense | null)[] = segments.map(() => null);
+  const pending: number[] = [];
+
+  segments.forEach((seg, i) => {
+    const extracted = extractAmount(seg);
+    const kw = extracted ? keywordCategory(seg) : null;
+    if (extracted && kw) {
+      out[i] = { ...extracted, category: kw, via: "keyword" };
+    } else {
+      pending.push(i); // no amount, or no keyword — let Gemini look at it
+    }
+  });
+
+  if (pending.length > 0) {
+    const bulk = await geminiBulk(pending.map((i) => segments[i]));
+    pending.forEach((segIdx, j) => {
+      if (bulk[j]) {
+        out[segIdx] = bulk[j];
+      } else {
+        // Gemini unavailable/failed: keep segments where the regex at least
+        // found an amount, categorised as Other.
+        const extracted = extractAmount(segments[segIdx]);
+        if (extracted) out[segIdx] = { ...extracted, category: "Other", via: "fallback" };
+      }
+    });
+  }
+
+  const saved = out.filter((p): p is ParsedExpense => p !== null);
+  return { saved, skipped: segments.length - saved.length };
+}
+
 export async function parseExpense(text: string): Promise<ParsedExpense | null> {
   const extracted = extractAmount(text);
 

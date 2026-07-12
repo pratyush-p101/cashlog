@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { sql } from "@/lib/db";
-import { parseExpense } from "@/lib/parse";
+import { parseExpenses } from "@/lib/parse";
 import { sendMessage } from "@/lib/telegram";
 import { CATEGORY_EMOJI } from "@/lib/categories";
 import { formatINR } from "@/lib/format";
@@ -41,9 +41,15 @@ const HELP = [
   "<code>wifi 600</code>",
   "<code>buy book for 100rs</code>",
   "",
+  "Several at once? One per line:",
+  "<code>chai 20</code>",
+  "<code>auto 60</code>",
+  "<code>groceries 450</code>",
+  "",
   "<b>Commands</b>",
   "/dashboard — get your private dashboard link",
   "/delete — remove the last saved expense",
+  "/clear — delete ALL expenses and start fresh",
   "/help — see this message again",
 ].join("\n");
 
@@ -127,32 +133,83 @@ export async function POST(req: NextRequest) {
           chatId,
           `🗑 Deleted: ${deleted[0].description} · ${formatINR(
             Number(deleted[0].amount)
-          )}`
+          )}\nSend /delete again to remove the next one.`
         );
       } else {
         await sendMessage(chatId, "Nothing to undo — no expenses yet.");
       }
+    } else if (command === "/clear") {
+      const rows = (await db`
+        SELECT count(*)::int AS count FROM expenses WHERE user_id = ${user.id}
+      `) as { count: number }[];
+      const count = rows[0].count;
+      if (count === 0) {
+        await sendMessage(chatId, "Nothing to clear — you have no expenses.");
+      } else {
+        await sendMessage(
+          chatId,
+          `⚠️ This will <b>permanently delete all ${count} expenses</b> from your dashboard. This cannot be undone.\n\n` +
+            `If you're sure, send /clearyes to confirm.\n` +
+            `To keep your data, just ignore this message.`
+        );
+      }
+    } else if (command === "/clearyes") {
+      const deleted = (await db`
+        DELETE FROM expenses WHERE user_id = ${user.id} RETURNING id
+      `) as { id: number }[];
+      if (deleted.length === 0) {
+        await sendMessage(chatId, "Nothing to clear — you have no expenses.");
+      } else {
+        await sendMessage(
+          chatId,
+          `🧹 Deleted ${deleted.length} expenses. Fresh start!\n` +
+            `Your dashboard is empty — log your first real expense now, like <code>chai 20</code> ☕`
+        );
+      }
     } else {
-      const parsed = await parseExpense(text);
-      if (!parsed) {
+      const { saved, skipped } = await parseExpenses(text);
+      if (saved.length === 0) {
         await sendMessage(
           chatId,
           `I couldn't find an amount in that. Try like:\n<code>zomato 110</code>`
         );
       } else {
-        console.log(
-          `categorised "${parsed.description}" -> ${parsed.category} (via ${parsed.via})`
-        );
-        await db`
-          INSERT INTO expenses (user_id, amount, description, category)
-          VALUES (${user.id}, ${parsed.amount}, ${parsed.description}, ${parsed.category})
-        `;
-        await sendMessage(
-          chatId,
-          `✅ Saved ${formatINR(parsed.amount)} · ${
-            CATEGORY_EMOJI[parsed.category]
-          } ${parsed.category}\n📊 ${dashboardUrl(user.secret)}`
-        );
+        for (const p of saved) {
+          console.log(
+            `categorised "${p.description}" -> ${p.category} (via ${p.via})`
+          );
+          await db`
+            INSERT INTO expenses (user_id, amount, description, category)
+            VALUES (${user.id}, ${p.amount}, ${p.description}, ${p.category})
+          `;
+        }
+        if (saved.length === 1) {
+          const p = saved[0];
+          await sendMessage(
+            chatId,
+            `✅ Saved ${formatINR(p.amount)} · ${
+              CATEGORY_EMOJI[p.category]
+            } ${p.category}\n📊 ${dashboardUrl(user.secret)}`
+          );
+        } else {
+          const total = saved.reduce((s, p) => s + p.amount, 0);
+          const lines = saved
+            .slice(0, 15)
+            .map(
+              (p) =>
+                `${CATEGORY_EMOJI[p.category]} ${p.description} · ${formatINR(p.amount)}`
+            );
+          if (saved.length > 15) lines.push(`…and ${saved.length - 15} more`);
+          await sendMessage(
+            chatId,
+            `✅ Saved ${saved.length} expenses · ${formatINR(total)} total\n\n` +
+              lines.join("\n") +
+              (skipped > 0
+                ? `\n\n⚠️ Couldn't read ${skipped} line${skipped === 1 ? "" : "s"} — no amount found.`
+                : "") +
+              `\n📊 ${dashboardUrl(user.secret)}`
+          );
+        }
       }
     }
   } catch (err) {
