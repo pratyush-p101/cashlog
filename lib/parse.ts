@@ -7,8 +7,10 @@ export interface ParsedExpense {
   via: "keyword" | "gemini" | "fallback";
 }
 
-// Matches "110", "1,10,000", "110.50", "5k", optionally prefixed ₹ / rs / inr.
-const AMOUNT_RE = /(?:₹|rs\.?|inr)?\s*(\d+(?:,\d{2,3})*(?:\.\d{1,2})?)\s*(k)?(?![\w.])/gi;
+// Matches "110", "1,10,000", "110.50", "5k", "100rs", "500/-", with ₹/rs/inr
+// allowed as prefix or suffix.
+const AMOUNT_RE =
+  /(?:₹|\brs\.?|\binr\b)?\s*(\d+(?:,\d{2,3})*(?:\.\d{1,2})?)\s*(k\b)?\s*(?:₹|rs\.?\b|inr\b|rupees?\b|rupaye\b|\/-)?(?![\w.])/gi;
 
 /**
  * Pulls the amount out of a message like "zomato 110" / "prants 5000 rs" /
@@ -31,9 +33,11 @@ export function extractAmount(
   const description = (
     text.slice(0, match.index) + text.slice(match.index + match[0].length)
   )
-    .replace(/(?:₹|\brs\.?|\binr\b)/gi, "")
+    .replace(/(?:₹|\brs\.?|\binr\b|\brupees?\b|\brupaye\b)/gi, "")
     .replace(/[-–—:,]+\s*$/g, "")
     .replace(/^\s*[-–—:,]+/g, "")
+    // drop dangling connectors: "buy book for 100rs" -> "buy book"
+    .replace(/\s+(?:for|of|at|on|in|worth|ka|ke|ki|ko|liye|liya|me|mein)\s*$/i, "")
     .replace(/\s+/g, " ")
     .trim();
 
@@ -51,7 +55,11 @@ function keywordCategory(text: string): Category | null {
   return null;
 }
 
-async function geminiCategory(description: string): Promise<Category | null> {
+/** One call to Gemini; returns the text answer or null (never throws). */
+async function geminiText(
+  prompt: string,
+  asJson: boolean
+): Promise<string | null> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
     console.log("gemini: skipped — GEMINI_API_KEY not set");
@@ -68,22 +76,14 @@ async function geminiCategory(description: string): Promise<Category | null> {
           "x-goog-api-key": key,
         },
         body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text:
-                    `Classify this Indian household expense into exactly one category.\n` +
-                    `Expense: "${description}"\n` +
-                    `Categories: ${CATEGORIES.join(", ")}\n` +
-                    `Reply with only the category name, nothing else.`,
-                },
-              ],
-            },
-          ],
+          contents: [{ parts: [{ text: prompt }] }],
           // Generous cap: thinking models spend output tokens on internal
           // reasoning before the (tiny) answer.
-          generationConfig: { temperature: 0, maxOutputTokens: 1024 },
+          generationConfig: {
+            temperature: 0,
+            maxOutputTokens: 1024,
+            ...(asJson ? { responseMimeType: "application/json" } : {}),
+          },
         }),
         signal: AbortSignal.timeout(6000),
       }
@@ -95,25 +95,72 @@ async function geminiCategory(description: string): Promise<Category | null> {
     const data = await res.json();
     // Join every text part — thinking models may split the reply into parts.
     const parts: { text?: string }[] = data?.candidates?.[0]?.content?.parts ?? [];
-    const answer: string = parts
+    const answer = parts
       .map((p) => p.text ?? "")
       .join(" ")
       .trim();
-    const lower = answer.toLowerCase();
-    const hit =
-      CATEGORIES.find((c) => c.toLowerCase() === lower) ??
-      CATEGORIES.find((c) => lower.includes(c.toLowerCase()));
-    if (!hit) console.error("gemini: unusable answer:", JSON.stringify(answer));
-    return hit ?? null;
+    return answer || null;
   } catch (err) {
     console.error("gemini: request failed:", err);
-    return null; // rate limit / timeout — fall through to "Other"
+    return null; // rate limit / timeout — caller falls back
+  }
+}
+
+async function geminiCategory(description: string): Promise<Category | null> {
+  const answer = await geminiText(
+    `Classify this Indian household expense into exactly one category.\n` +
+      `Expense: "${description}"\n` +
+      `Categories: ${CATEGORIES.join(", ")}\n` +
+      `Reply with only the category name, nothing else.`,
+    false
+  );
+  if (!answer) return null;
+  const lower = answer.toLowerCase();
+  const hit =
+    CATEGORIES.find((c) => c.toLowerCase() === lower) ??
+    CATEGORIES.find((c) => lower.includes(c.toLowerCase()));
+  if (!hit) console.error("gemini: unusable answer:", JSON.stringify(answer));
+  return hit ?? null;
+}
+
+/**
+ * Full natural-language fallback: when the regex finds no amount at all
+ * ("spent hundred bucks on a book"), ask Gemini to pull out everything.
+ */
+async function geminiExtract(text: string): Promise<ParsedExpense | null> {
+  const answer = await geminiText(
+    `Extract the expense from this message (Indian household, amounts in INR).\n` +
+      `Message: "${text}"\n` +
+      `Reply with only JSON: {"amount": <number in rupees>, ` +
+      `"description": "<2-4 words, no amount>", ` +
+      `"category": "<one of: ${CATEGORIES.join(", ")}>"}\n` +
+      `If the message contains no money amount at all, reply {"amount": 0}.`,
+    true
+  );
+  if (!answer) return null;
+  try {
+    const cleaned = answer.replace(/^```(?:json)?/i, "").replace(/```$/, "");
+    const parsed = JSON.parse(cleaned);
+    const amount = Number(parsed?.amount);
+    if (!isFinite(amount) || amount <= 0) return null;
+    const category =
+      CATEGORIES.find(
+        (c) => c.toLowerCase() === String(parsed?.category ?? "").toLowerCase()
+      ) ?? "Other";
+    const description =
+      String(parsed?.description ?? "").trim().slice(0, 100) || "Expense";
+    return { amount, description, category, via: "gemini" };
+  } catch {
+    console.error("gemini: extract returned non-JSON:", answer.slice(0, 200));
+    return null;
   }
 }
 
 export async function parseExpense(text: string): Promise<ParsedExpense | null> {
   const extracted = extractAmount(text);
-  if (!extracted) return null;
+
+  // Regex found no amount — let Gemini read the whole message.
+  if (!extracted) return geminiExtract(text);
 
   const fromKeywords = keywordCategory(text);
   if (fromKeywords) {

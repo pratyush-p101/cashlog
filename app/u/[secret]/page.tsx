@@ -9,10 +9,10 @@ export default async function UserDashboard({
   searchParams,
 }: {
   params: Promise<{ secret: string }>;
-  searchParams: Promise<{ m?: string; d?: string }>;
+  searchParams: Promise<{ m?: string; d?: string; c?: string }>;
 }) {
   const { secret } = await params;
-  const { m, d } = await searchParams;
+  const { m, d, c } = await searchParams;
 
   if (!/^[A-Za-z0-9_-]{8,32}$/.test(secret)) notFound();
 
@@ -46,6 +46,7 @@ export default async function UserDashboard({
       expenses={expenses}
       selectedMonth={m}
       selectedDay={d}
+      selectedCategory={c}
       basePath={`/u/${secret}`}
     />
   );

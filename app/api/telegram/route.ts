@@ -35,17 +35,37 @@ async function ensureUser(telegramId: number, name: string): Promise<DbUser> {
 }
 
 const HELP = [
-  "Just message an expense and I'll save it. Examples:",
-  "",
+  "<b>How to add an expense</b>",
+  "Just type what you spent — any of these work:",
   "<code>zomato 110</code>",
-  "<code>pants 5000</code>",
-  "<code>wifi - 600</code>",
+  "<code>wifi 600</code>",
+  "<code>buy book for 100rs</code>",
   "",
-  "Commands:",
-  "/dashboard — your private dashboard link",
-  "/undo — delete the last entry",
-  "/help — this message",
+  "<b>Commands</b>",
+  "/dashboard — get your private dashboard link",
+  "/delete — remove the last saved expense",
+  "/help — see this message again",
 ].join("\n");
+
+function welcome(firstName: string, url: string): string {
+  return [
+    `Hi ${firstName} 👋 I'm <b>CashLog</b> — I track your daily expenses right here in the chat.`,
+    "",
+    "<b>It works in 3 steps:</b>",
+    "1️⃣ Text me an expense as you spend — like <code>zomato 110</code> or <code>petrol 500</code>",
+    "2️⃣ I save it and sort it into a category automatically",
+    "3️⃣ Open your dashboard anytime for month-wise &amp; category-wise totals:",
+    "",
+    `📊 ${url}`,
+    "",
+    "Typed something wrong? Send /delete to remove the last entry.",
+    "Send /help anytime to see this again.",
+    "",
+    "🔒 Keep your dashboard link private — anyone with it can see your expenses.",
+    "",
+    "Try it now — send your last expense, like <code>chai 20</code> ☕",
+  ].join("\n");
+}
 
 export async function POST(req: NextRequest) {
   // Reject calls that don't carry the secret we registered with Telegram.
@@ -85,16 +105,13 @@ export async function POST(req: NextRequest) {
     if (command === "/start") {
       await sendMessage(
         chatId,
-        `Hi ${from.first_name || "there"} 👋 I'm <b>CashLog</b>.\n\n` +
-          `${HELP}\n\n` +
-          `📊 Your private dashboard:\n${dashboardUrl(user.secret)}\n\n` +
-          `Keep that link to yourself — anyone with it can see your expenses.`
+        welcome(from.first_name || "there", dashboardUrl(user.secret))
       );
     } else if (command === "/dashboard" || command === "/link") {
       await sendMessage(chatId, `📊 ${dashboardUrl(user.secret)}`);
     } else if (command === "/help") {
       await sendMessage(chatId, HELP);
-    } else if (command === "/undo") {
+    } else if (command === "/undo" || command === "/delete") {
       const deleted = (await db`
         DELETE FROM expenses
         WHERE id = (

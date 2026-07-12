@@ -54,15 +54,16 @@ function sample(): ExpenseRow[] {
 export default async function DemoPage({
   searchParams,
 }: {
-  searchParams: Promise<{ m?: string; d?: string }>;
+  searchParams: Promise<{ m?: string; d?: string; c?: string }>;
 }) {
-  const { m, d } = await searchParams;
+  const { m, d, c } = await searchParams;
   return (
     <Dashboard
       name="Demo user"
       expenses={sample()}
       selectedMonth={m}
       selectedDay={d}
+      selectedCategory={c}
       basePath="/demo"
     />
   );
