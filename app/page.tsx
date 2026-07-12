@@ -1,6 +1,7 @@
 import Link from "next/link";
 
-const BOT = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
+const BOT =
+  process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || "cashlog_tracker_bot";
 
 export default function Home() {
   return (
@@ -13,13 +14,9 @@ export default function Home() {
         See everything on your private dashboard — no app, no login.
       </p>
 
-      {BOT ? (
-        <a className="cta" href={`https://t.me/${BOT}`}>
-          Open the bot on Telegram
-        </a>
-      ) : (
-        <span className="cta">Get the bot link from your host</span>
-      )}
+      <a className="cta" href={`https://t.me/${BOT}`}>
+        Open the bot on Telegram
+      </a>
       <Link className="cta ghost" href="/demo">
         See a demo dashboard
       </Link>
