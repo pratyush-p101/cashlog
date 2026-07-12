@@ -53,8 +53,11 @@ function keywordCategory(text: string): Category | null {
 
 async function geminiCategory(description: string): Promise<Category | null> {
   const key = process.env.GEMINI_API_KEY;
-  if (!key) return null;
-  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
+  if (!key) {
+    console.log("gemini: skipped — GEMINI_API_KEY not set");
+    return null;
+  }
+  const model = process.env.GEMINI_MODEL || "gemini-flash-lite-latest";
   try {
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
@@ -78,20 +81,32 @@ async function geminiCategory(description: string): Promise<Category | null> {
               ],
             },
           ],
-          generationConfig: { temperature: 0, maxOutputTokens: 10 },
+          // Generous cap: thinking models spend output tokens on internal
+          // reasoning before the (tiny) answer.
+          generationConfig: { temperature: 0, maxOutputTokens: 1024 },
         }),
         signal: AbortSignal.timeout(6000),
       }
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error("gemini: HTTP", res.status, (await res.text()).slice(0, 300));
+      return null;
+    }
     const data = await res.json();
-    const answer: string =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
-    const hit = CATEGORIES.find(
-      (c) => c.toLowerCase() === answer.toLowerCase()
-    );
+    // Join every text part — thinking models may split the reply into parts.
+    const parts: { text?: string }[] = data?.candidates?.[0]?.content?.parts ?? [];
+    const answer: string = parts
+      .map((p) => p.text ?? "")
+      .join(" ")
+      .trim();
+    const lower = answer.toLowerCase();
+    const hit =
+      CATEGORIES.find((c) => c.toLowerCase() === lower) ??
+      CATEGORIES.find((c) => lower.includes(c.toLowerCase()));
+    if (!hit) console.error("gemini: unusable answer:", JSON.stringify(answer));
     return hit ?? null;
-  } catch {
+  } catch (err) {
+    console.error("gemini: request failed:", err);
     return null; // rate limit / timeout — fall through to "Other"
   }
 }

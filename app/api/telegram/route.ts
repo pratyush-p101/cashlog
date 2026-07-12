@@ -123,6 +123,9 @@ export async function POST(req: NextRequest) {
           `I couldn't find an amount in that. Try like:\n<code>zomato 110</code>`
         );
       } else {
+        console.log(
+          `categorised "${parsed.description}" -> ${parsed.category} (via ${parsed.via})`
+        );
         await db`
           INSERT INTO expenses (user_id, amount, description, category)
           VALUES (${user.id}, ${parsed.amount}, ${parsed.description}, ${parsed.category})
