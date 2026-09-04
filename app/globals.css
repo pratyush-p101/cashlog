@@ -665,6 +665,19 @@ div:first-of-type > .day-head {
   box-shadow: var(--m-elev-1);
 }
 
+.m-btn.text {
+  color: var(--m-primary);
+  padding: 14px 20px;
+}
+
+.m-btn.text:hover {
+  background: var(--m-surface-container);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
 .lp-fine {
   font-size: 13px;
   color: var(--m-on-surface-variant);
@@ -830,6 +843,200 @@ div:first-of-type > .day-head {
   text-align: center;
   justify-self: start;
   width: 100%;
+}
+
+/* Back Tap / shortcut setup */
+.sc-intro {
+  margin-bottom: 28px;
+}
+
+.sc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.sc-card {
+  padding: 24px 22px;
+}
+
+.sc-step-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.sc-step-head .s-num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--m-primary);
+  color: var(--m-on-primary);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.sc-step-head h3 {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.sc-p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--m-on-surface-variant);
+  margin-bottom: 14px;
+}
+
+.sc-input {
+  width: 100%;
+  font: inherit;
+  font-size: 14.5px;
+  color: var(--m-on-surface);
+  background: var(--m-surface);
+  border: 1px solid var(--m-outline-variant);
+  border-radius: 14px;
+  padding: 13px 16px;
+  outline: none;
+}
+
+.sc-input::placeholder {
+  color: var(--m-on-surface-variant);
+  opacity: 0.75;
+}
+
+.sc-input:focus {
+  border-color: var(--m-primary);
+  box-shadow: 0 0 0 3px var(--m-primary-container);
+}
+
+.sc-out {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--m-surface-container-high);
+  opacity: 0.6;
+}
+
+.sc-out.ready {
+  opacity: 1;
+  background: var(--m-primary-container);
+}
+
+.sc-out code {
+  flex: 1;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  color: var(--m-on-surface);
+}
+
+.sc-out.ready code {
+  color: var(--m-on-primary-container);
+}
+
+.sc-copy {
+  flex: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  border-radius: 999px;
+  padding: 9px 16px;
+  background: var(--m-primary);
+  color: var(--m-on-primary);
+}
+
+.sc-copy:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.sc-warn {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--m-on-surface-variant);
+  margin-top: 10px;
+}
+
+.sc-oneTap {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--m-outline-variant);
+}
+
+.sc-oneTap .m-btn {
+  width: 100%;
+  justify-content: center;
+}
+
+.sc-list {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.sc-list li {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--m-on-surface-variant);
+}
+
+.sc-list li::marker {
+  color: var(--m-primary);
+  font-weight: 700;
+}
+
+.sc-list b {
+  color: var(--m-on-surface);
+}
+
+.sc-list code,
+.sc-tip code,
+.sc-oneTap code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--m-on-primary-container);
+  background: var(--m-primary-container);
+  border-radius: 7px;
+  padding: 2px 7px;
+}
+
+.sc-tip {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--m-on-surface-variant);
+  background: var(--m-surface-container-high);
+  border-radius: 14px;
+  padding: 13px 15px;
+  margin-top: 16px;
+}
+
+.sc-alt {
+  max-width: 62ch;
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 22px;
+  line-height: 1.6;
+}
+
+.sc-alt b {
+  color: var(--m-on-surface);
 }
 
 /* Closing CTA */

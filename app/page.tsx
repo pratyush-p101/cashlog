@@ -1,8 +1,12 @@
 import Link from "next/link";
+import ShortcutSetup from "@/components/ShortcutSetup";
 
 const BOT =
   process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || "cashlog_tracker_bot";
 const BOT_URL = `https://t.me/${BOT}`;
+// Optional: an iCloud shortcut link (icloud.com/shortcuts/…) you create once
+// on your own iPhone and share. When set, visitors get a one-tap install.
+const SHORTCUT_URL = process.env.NEXT_PUBLIC_SHORTCUT_URL;
 
 const FEATURES = [
   {
@@ -43,7 +47,7 @@ const FEATURES = [
   {
     icon: "⚡",
     title: "Add from your home screen",
-    body: "Set up an iPhone Back Tap or Android shortcut and log an expense in three seconds, without opening any app.",
+    body: "Double-tap the back of your iPhone to log an expense in three seconds, without opening any app. Setup guide below.",
   },
 ];
 
@@ -75,6 +79,9 @@ export default function Home() {
             <Link className="m-btn tonal" href="/demo">
               See a live dashboard
             </Link>
+            <a className="m-btn text" href="#backtap">
+              Set up Back Tap ↓
+            </a>
           </div>
           <p className="lp-fine">
             Built for Indian households · Works on any phone with Telegram
@@ -143,6 +150,109 @@ export default function Home() {
               </div>
             ))}
           </div>
+        </section>
+
+        <section className="lp-section" id="backtap">
+          <div className="lp-h2">Power move</div>
+          <div className="lp-sub">
+            Log an expense by double-tapping your iPhone
+          </div>
+          <p className="lp-lead sc-intro">
+            Tap the back of your phone twice, type what you spent, done — in
+            about three seconds, without opening a single app. One-time setup,
+            roughly five minutes. Works on iPhone 8 and newer.
+          </p>
+
+          <div className="sc-grid">
+            <ShortcutSetup shortcutUrl={SHORTCUT_URL} />
+
+            <div className="m-card sc-card">
+              <div className="sc-step-head">
+                <span className="s-num">2</span>
+                <h3>Build the shortcut</h3>
+              </div>
+              <ol className="sc-list">
+                <li>
+                  Open the <b>Shortcuts</b> app (it&apos;s built into every
+                  iPhone) and tap <b>+</b> in the top-right corner.
+                </li>
+                <li>
+                  You&apos;ll see an empty shortcut with a search bar saying{" "}
+                  <i>“Search for apps and actions”</i>. That search bar is how
+                  you add every step below.
+                </li>
+                <li>
+                  Search <code>Ask for Input</code> and tap it. Set{" "}
+                  <b>Input type</b> to <b>Text</b>, and change the prompt to{" "}
+                  <i>“What did you spend?”</i>
+                </li>
+                <li>
+                  Search <code>Get Contents of URL</code> and tap it. Paste your
+                  copied link from step 1 into its URL field.
+                </li>
+                <li>
+                  Tap <b>Show More</b> on that same action to expand it, then
+                  set <b>Method</b> to <b>POST</b> and <b>Request Body</b> to{" "}
+                  <b>JSON</b>.
+                </li>
+                <li>
+                  Tap <b>Add new field</b> → choose <b>Text</b> → type{" "}
+                  <code>text</code> as the key. Tap the empty value box beside
+                  it and pick the blue <b>Provided Input</b> variable.
+                </li>
+                <li>
+                  Search <code>Show Notification</code> and tap it. Clear its
+                  text and insert the <b>Contents of URL</b> variable, so you
+                  see the ✅ confirmation.
+                </li>
+                <li>
+                  Tap the name at the top, rename it to{" "}
+                  <b>Add Expense</b>, and tap <b>Done</b>.
+                </li>
+              </ol>
+              <p className="sc-tip">
+                💡 Test it: run the shortcut and send <code>chai 20</code>. You
+                should see “✅ ₹20 · 🍔 Food”.
+              </p>
+            </div>
+
+            <div className="m-card sc-card">
+              <div className="sc-step-head">
+                <span className="s-num">3</span>
+                <h3>Turn on Back Tap</h3>
+              </div>
+              <ol className="sc-list">
+                <li>
+                  Open <b>Settings</b> → <b>Accessibility</b>.
+                </li>
+                <li>
+                  Tap <b>Touch</b> (under the “Physical and Motor” heading).
+                </li>
+                <li>
+                  Scroll all the way to the bottom and tap <b>Back Tap</b>.
+                </li>
+                <li>
+                  Choose <b>Double Tap</b>.
+                </li>
+                <li>
+                  Scroll past the system options to the <b>Shortcuts</b> section
+                  at the bottom, and tap <b>Add Expense</b>.
+                </li>
+              </ol>
+              <p className="sc-tip">
+                ✅ Done. Double-tap the back of your phone — the prompt appears,
+                and you can type or tap the mic to speak the expense. Your phone
+                needs to be unlocked for the prompt to show.
+              </p>
+            </div>
+          </div>
+
+          <p className="lp-fine sc-alt">
+            Not on iPhone? Open your dashboard and choose{" "}
+            <b>Share → Add to Home Screen</b> — it opens like an app with a
+            quick-add box at the top. Android users can also use any
+            HTTP-shortcut app with the same link.
+          </p>
         </section>
 
         <section className="lp-section">
