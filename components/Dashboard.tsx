@@ -1,4 +1,5 @@
 import Link from "next/link";
+import QuickAdd from "./QuickAdd";
 import { CATEGORIES, CATEGORY_EMOJI, type Category } from "@/lib/categories";
 import {
   dayKey,
@@ -37,6 +38,7 @@ export default function Dashboard({
   selectedDay,
   selectedCategory,
   basePath,
+  quickAddSecret,
 }: {
   name: string;
   expenses: ExpenseRow[];
@@ -44,6 +46,7 @@ export default function Dashboard({
   selectedDay?: string;
   selectedCategory?: string;
   basePath: string;
+  quickAddSecret?: string;
 }) {
   const cat = CATEGORIES.find((c) => c === selectedCategory);
   const monthKeys = lastMonthKeys(6);
@@ -131,6 +134,8 @@ export default function Dashboard({
         </div>
         <div className="who">{name}</div>
       </div>
+
+      {quickAddSecret && <QuickAdd secret={quickAddSecret} />}
 
       <section className="card">
         <div className="hero-label">Spent in {monthLabel(selected)}</div>

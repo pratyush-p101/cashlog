@@ -48,6 +48,7 @@ export default async function UserDashboard({
       selectedDay={d}
       selectedCategory={c}
       basePath={`/u/${secret}`}
+      quickAddSecret={secret}
     />
   );
 }
